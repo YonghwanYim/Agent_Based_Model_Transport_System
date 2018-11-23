@@ -1,5 +1,5 @@
 ;; Project title : Advanced patient transport system of ambulance (Agent-Based Model)
-;; Author : Yonghwan Yim
+;; Author : Yim Yonghwan
 ;; Final Update : 2015.10.15
 
 globals [ time-step number-of-cars ]
