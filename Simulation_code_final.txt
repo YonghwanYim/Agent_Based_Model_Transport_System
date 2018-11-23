@@ -1,0 +1,186 @@
+;; Project title : Advanced patient transport system of ambulance (Agent-Based Model)
+;; Author : Yonghwan Yim
+;; Final Update : 2015.10.15
+
+globals [ time-step number-of-cars ]
+turtles-own [ 
+              a v0 v step
+              turtle-ahead-up
+              turtle-ahead-down
+              s s* acc y ]
+breed [ bluecars1 bluecar1 ]
+breed [ bluecars2 bluecar2 ]
+breed [ ambulances ambulance ]
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;Setup procedure;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to setup
+  ca             ;;clear-all
+  reset-ticks
+  set time-step 0.01
+  ask patches
+  [
+    ifelse ( pycor <= 3 and pycor >= -3 ) 
+    [ set pcolor grey + 1 ]
+    [ set pcolor green ]
+      
+    if ( pycor = 0 and pxcor mod 3 = 0 )
+    [ set pcolor white ]
+  ]
+  set number-of-cars vehicle-density * 0.5 * 2
+  
+  create-bluecars1 number-of-cars * 50 * 0.01
+  create-bluecars2 number-of-cars * 50 * 0.01
+  create-ambulances 1
+  
+  ask bluecars1  ;; top lane
+  [
+    move-to one-of patches with
+    [ 
+      pxcor mod 3 = 0 and pycor = 2 and not any? turtles in-radius 2
+    ]
+    set shape "car top"
+    set size 2
+    set heading 90
+    set color blue
+  ]
+  
+  ask bluecars2  ;; bottom lane
+  [
+    move-to one-of patches with
+    [
+      pxcor mod 3 = 0 and pycor = -2 and not any? turtles in-radius 2
+    ]
+    set shape "car top"
+    set size 2
+    set heading 90
+    set color blue
+  ]
+
+  ask ambulances
+  [
+    move-to one-of patches with
+    [
+      pxcor = ( min-pxcor + 2 ) and pycor = 0
+    ]
+    set shape "car top"
+    set size 2
+    set heading 90
+    set color red
+  ]
+  
+  ask ambulances
+  [
+    set a random-normal acceleration-mean acceleration-std
+    
+    set v0 desired-speed / 3.6            
+    
+    set v speed / 3.6
+  ]
+  
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;Go procedure;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to go
+ 
+  tick
+  ;go-plot  ;; make a plot (Ambulance speed)
+  change-lane
+  recalculate-front-up
+  recalculate-front-down
+  calculate-speed-ambulance
+ 
+  ask ambulances 
+  [
+    set v v + acc * time-step 
+    
+    if ( v >= v0 ) [ set v v0 ]
+    
+    if ( v <= 0 ) [ set v 0 ]
+    
+    set y ( v * time-step )
+    
+    fd y    ;; move forward to y
+  ]
+  
+end
+
+to recalculate-front-up
+  
+  ask ambulances
+  [
+    set step 0 set turtle-ahead-up 0
+    
+    ifelse ( any? turtles with [ ycor = [ ycor + 2 ] of myself and xcor >= [ xcor ] of myself ] )
+    [ while [ turtle-ahead-up = 0 ] [ set step step + 1 if ( any? turtles-at step 2 ) [ set turtle-ahead-up one-of turtles-at step 2 ]]]
+    
+    [ set turtle-ahead-up min-one-of turtles with [ ycor = [ ycor + 2 ] of myself ] [ xcor ] ]
+  ] 
+
+end
+
+to recalculate-front-down
+  
+  ask ambulances
+  [
+    set step 0 set turtle-ahead-down 0
+    
+    ifelse ( any? turtles with [ ycor = [ ycor - 2 ] of myself and xcor >= [ xcor ] of myself ] )
+    [ while [ turtle-ahead-down = 0 ] [ set step step + 1 if ( any? turtles-at step -2 ) [ set turtle-ahead-down one-of turtles-at step -2 ]]]
+    
+    [ set turtle-ahead-down min-one-of turtles with [ ycor = [ ycor - 2 ] of myself ] [ xcor ] ]
+  ] 
+
+end
+
+
+to calculate-speed-ambulance   ;; Inteligent Driver Model(IDM) 
+                               ;; s(front distance) s*(safe distance)  
+  ask ambulances
+  
+  [
+    ifelse ( ( distance turtle-ahead-up ) >= ( distance turtle-ahead-down ) )
+    [ set s distance turtle-ahead-down - 2 ]
+    [ set s distance turtle-ahead-up - 2 ]
+    
+    if ( s = 0 )[ set s max-pxcor * 2 - 2 ]    ;; max-pxcor : patch size
+    
+    set s* ( v * reaction-time )  
+    
+    set acc a * ( 1 - ( v / v0 ) ^ 4 - ( s* / s ) ^ 2 )
+  ]
+
+end
+
+to change-lane
+ 
+  ask bluecars1     ;; lane 1
+  [
+    if ( ycor = 2 and any? turtles with [ ycor = [ ycor - 2 ] of myself and xcor > [ xcor - siren-distance ] of myself ] )
+    [
+      if ( random 100000 > ( 100000 - ( probability * 1000 ) ) ) [ left 30 forward 2 ]
+    ]
+  ]
+  
+    ask bluecars2   ;; lane 2
+  [
+    if ( ycor = -2 and any? turtles with [ ycor = [ ycor + 2 ] of myself and xcor > [ xcor - siren-distance ] of myself ] )
+    [
+      if ( random 100000 > ( 100000 - ( probability * 1000 ) ) ) [ right 30 forward 2 ]
+    ]
+  ]
+
+end
+  
+;to go-plot
+;  
+;  set-current-plot "Ambulance speed(km/h)"
+;  set-current-plot-pen "Ambulance"
+;  plotxy ticks mean [v] of ambulances * 3.6
+;  
+;end
